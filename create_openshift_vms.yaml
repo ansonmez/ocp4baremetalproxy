@@ -1,0 +1,94 @@
+---
+- name: Create OpenShift Master VMs
+  hosts: localhost
+  gather_facts: true
+  vars:
+    vm_name_prefix: "{{ ocp_master_vm_name }}"
+    memory: "{{ ocp_master_vm_memory }}"
+    number_of_vms: "{{ ocp_master_vm_count }}"
+    vm_tag: "{{ ocp_master_vm_tag }}"
+    vm_dns_domain: "{{ ocp_master_vm_dns_domain }}"
+    is_stateless: False
+    vm_disks: "{{ ocp_master_disks }}"
+    node_role: ""
+  tasks:
+  - name: include variables
+    include_vars: myvars.yaml
+
+  - import_tasks: installtfp.yaml
+
+  - name: configure dnsmasq
+    include_tasks: configurednsmasq.yaml
+
+  - name: Login to RHV
+    ovirt_auth:
+      url: "{{ ovirt_url }}"
+      username: "{{ ovirt_username }}"
+      password: "{{ ovirt_password }}"
+      insecure: true
+
+  - name: fact for ips
+    set_fact:
+      master_ip_addresses: "{{ master_ips.split(',') }}"
+      worker_ip_addresses: "{{ worker_ips.split(',') }}"
+      bootstrap_ip_addresses: "{{ bootstrap_ip.split(',') }}"
+
+  - name: create bootstrap vm
+    import_tasks: create_ovirt_vms.yaml
+    vars:
+      vm_name_prefix: "{{ vm_bootstrap_name }}"
+      number_of_vms: 1
+
+  - name: create master vms
+    import_tasks: create_ovirt_vms.yaml 
+    vars:
+      vm_name_prefix: "{{ vm_master_name_prefix }}"
+      number_of_vms: "{{ ocp_master_vm_count }}"
+      node_role: master
+
+  - name: create worker vms
+    import_tasks: create_ovirt_vms.yaml
+    vars:
+      vm_name_prefix: "{{ vm_worker_name_prefix }}"
+      number_of_vms: "{{ ocp_worker_vm_count }}"
+      node_role: worker
+  
+  - name: install haproxy
+    include_tasks: haproxy.yaml
+
+
+
+  - name: update host dnsmasq for dhcp options to fix ips
+    import_tasks: update_pxeboot_dnsmasq.yaml
+    vars:
+      vm_name: "{{ vm_bootstrap_name }}1"
+      ign_type: bootstrap
+      vmip: "{{ bootstrap_ip_addresses[0] }}"
+
+  - name: update host dnsmasq for dhcp options to fix ips
+    include_tasks: update_pxeboot_dnsmasq.yaml
+    vars:
+      vm_name: "{{ vm_master_name_prefix }}{{ item }}"
+      ign_type: master
+      vmip: "{{master_ip_addresses[ item | int-1 ]}}"
+    with_sequence: count={{ ocp_master_vm_count }}
+
+  - name: update host dnsmasq for dhcp options to fix ips
+    include_tasks: update_pxeboot_dnsmasq.yaml
+    vars:
+      vm_name: "{{ vm_worker_name_prefix }}{{ item }}"
+      ign_type: worker
+      vmip: "{{worker_ip_addresses[ item | int-1 ]}}"
+    with_sequence: count={{ ocp_worker_vm_count }}
+
+  - name: update etcd records 
+    lineinfile:
+      path: /etc/hosts
+      regexp: "etcd-{{ item | int-1  }}"
+      line: "{{master_ip_addresses[ item | int-1 ]}}     etcd-{{ item | int-1 }}.{{ cluster_name }}.{{ domain_name }}"
+    with_sequence: count={{ ocp_master_vm_count }}
+
+  - name : restart haproxy
+    service:
+      name: haproxy
+      state: restarted

@@ -1,0 +1,5 @@
+files
+.*
+!.gitignore
+install-config.yaml
+myvars.yaml

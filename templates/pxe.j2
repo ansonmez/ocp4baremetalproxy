@@ -1,0 +1,6 @@
+DEFAULT {{ vm_name }}
+LABEL {{ vm_name }}
+MENU LABEL {{ vm_name }}
+  ipappend 2
+  kernel  http://{{ httpd_ip }}:{{ webport }}/{{ otherinstall_dir }}/{{ installer_kernel }}
+ append rd.neednet=1 initrd=http://{{ httpd_ip }}:{{ webport }}/{{ otherinstall_dir }}/{{ initramfs_path }}  console=tty0 console=ttyS0 coreos.inst=yes coreos.inst.install_dev={{ coreos_inst_install_dev }} coreos.inst.image_url=http://{{ httpd_ip }}:{{ webport }}/{{ otherinstall_dir }}/{{ coreos_inst_image_file }} coreos.inst.ignition_url=http://{{ httpd_ip }}:{{ webport }}/{{ coreos_inst_ignition_dir }}/{{  ign_type }}.ign ip={{ vmip }}::{{ routerip}}:{{ subnetmask }}:{{ vm_name }}.{{ cluster_name }}.{{ domain_name }}::none nameserver={{ dns_server }}

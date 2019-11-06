@@ -1,0 +1,37 @@
+- name: collect mac address
+  ovirt_nic_facts:
+    auth: "{{ ovirt_auth }}"
+    vm: "{{ vm_name }}"
+
+- name: get vm mac address
+  set_fact:
+    mac_address: "{{ ovirt_nics[0]['mac']['address'] }}"
+
+- name: update pxe file 
+  template:
+    src: templates/pxe.j2
+    dest: /var/lib/tftpboot/pxelinux.cfg/01-{{ mac_address |regex_replace(':','-')|lower  }}
+
+- name: update ether file
+  lineinfile:
+    path: /etc/ethers
+    create: yes
+    regexp: "{{ vm_name }}$"
+    line: "{{ mac_address }} {{ vm_name }}"
+
+- name: update dhcp-host in dnsmasq for fixed ips for mac
+  lineinfile:
+    path: /etc/dnsmasq.conf 
+    line: "dhcp-host={{ vm_name }}"
+
+- name: update host file for bootstrap
+  lineinfile:
+    path: /etc/hosts
+    regexp: "{{ vm_name }}"
+    line: "{{ vmip }}  {{ vm_name }}   {{ vm_name }}.{{ cluster_name }}.{{ domain_name }}"
+
+- name: update host file for bootstrap
+  lineinfile:
+    path: /etc/hosts
+    regexp: "api-int.{{ cluster_name }}.{{ domain_name }}"
+    line: "{{ haproxyip }}  lb.{{ cluster_name }}.{{ domain_name }}  api.{{ cluster_name }}.{{ domain_name }} api-int.{{ cluster_name }}.{{ domain_name }}"
