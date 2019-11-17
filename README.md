@@ -23,6 +23,11 @@ mkdir files; cd files; wget https://mirror.openshift.com/pub/openshift-v4/client
 
 CHECK myvars.yaml
 
+During installation you need patch imageregistry 
+oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"storage":{"emptyDir":{}}}}'
+
+If your master nodes also worker, update haproxy redirect traffic for port 80,443 to masters. 
+
 ansible-playbook create_openshift_vms.yaml -e ovirt_url=xxxx e ovirt_username=xxxxx -e ovirt_password=''
 ansible-playbook ocpbaremetal.yaml
 Start bootstrap server , master servers than workeers
